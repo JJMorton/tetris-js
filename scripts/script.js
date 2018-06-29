@@ -16,9 +16,42 @@ game.getCellState = function(x, y) {
     return cell.classList.contains("enabled");
 }
 
+game.checkForLines = function() {
+    let rows = new Array(game.grid.height).fill(0);
+    for (const tile of game.tiles) {
+        for (const cell of tile) {
+            if (cell.filled) rows[cell.y]++;
+        }
+    }
+
+    rows = rows
+        .map((x, i) => x === game.grid.width ? i : -1)
+        .filter(x => x >= 0);
+    
+    if (rows.length > 0) redraw = true;
+    
+    for (const lineIndex of rows) {
+        for (const tile of game.tiles) {
+            const removeIndex = lineIndex - tile.pos.y;
+            if (removeIndex >= 0 && removeIndex < tile.structure.length) {
+                // Empty row
+                tile.structure.splice(removeIndex, 1);
+                tile.pos.y++;
+            }
+            else if (removeIndex >= tile.structure.length) {
+                // Move entire tile down one
+                tile.pos.y++;
+            }
+        }
+    }
+}
+
 game.newTile = function() {
     // Add falling tile to fallen
     if (game.tileActive) game.tiles.push(game.tileActive);
+
+    // Check for lines
+    game.checkForLines();
 
     // Make first tile in buffer fall
     game.tileActive = game.tilesBuffer.shift();
@@ -106,8 +139,6 @@ game.tick = function({delta}) {
 
 
         if (update) {
-
-            /* Update cells */
 
             lastUpdate = currentTime;
 
