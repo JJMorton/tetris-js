@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto');
+
+body, html {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #282828;
+}
+
+#fps-container {
+    position: fixed;
+    margin: 0;
+    padding: 2px;
+    color: #888888;
+    font-size: 11px;
+    font-family: consolas;
+    bottom: 0;
+    right: 0;
+}
+
+#game-container {
+    position: absolute;
+    height: 90vh;
+    width: 45vh;
+    min-height: 550px;
+    min-width: 275px;
+    background-color: #212121;
+    border: 1px solid #000000;
+    box-shadow: 0 0 10px 0px #00000080;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    margin: auto;
+}
+
+#game-over {
+    position: absolute;
+    display: none;
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+    line-height: 90vh;
+    top: 0;
+    font-size: 20px;
+    color: white;
+    text-align: center;
+    font-family: 'Roboto', sans-serif;
+    background-color: #00000090;
+}
+
+#game {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+#game .row {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+}
+
+#game .row .cell {
+    flex: 1;
+    margin: 1px;
+}
+
+#game .row .cell.top {
+    margin-top: 0px;
+    padding-top: 1px;
+}
+
+#game .row .cell.right {
+    margin-right: 0px;
+    padding-right: 1px;
+}
+
+#game .row .cell.bottom {
+    margin-bottom: 0px;
+    padding-bottom: 1px;
+}
+
+#game .row .cell.left {
+    margin-left: 0px;
+    padding-left: 1px;
+}
