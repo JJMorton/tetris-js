@@ -1,17 +1,37 @@
 'use strict';
 
 
-/* Variables to keep track of timing */
-
-let redraw, lastUpdate, lastKeyUpdate;
-const updatePeriod = 500;
-const keyUpdatePeriod = 150;
-let downKeyState = false;
-
-
-/* Main game */
-
 const game = new Game(document.getElementById('game-canvas'));
+
+
+/* Key capture to prevent infinitely fast spam */
+
+const keys = [
+
+    new Key("ArrowDown", 130, () => {
+        game.currentScore++;
+        game.update(game.ctx);
+    }),
+
+    new Key("ArrowLeft", 130, () => {
+        if (game.playing && game.tileActive) game.tileActive.moveLeft(game);
+    }),
+
+    new Key("ArrowRight", 130, () => {
+        if (game.playing && game.tileActive) game.tileActive.moveRight(game);
+    }),
+
+    new Key("ArrowUp", 0, () => {
+        if (game.playing && game.tileActive) game.tileActive.rotate(game);
+    }),
+
+    new Key("Enter", 0, () => {
+        if (!game.playing) game.init();
+    })
+]
+
+
+/* Checks the grid for any full rows and clears them */
 
 game.checkForLines = function() {
     let rows = new Array(game.grid.height).fill(0);
@@ -24,8 +44,6 @@ game.checkForLines = function() {
     rows = rows
         .map((x, i) => x === game.grid.width ? i : -1)
         .filter(x => x >= 0);
-    
-    if (rows.length > 0) redraw = true;
 
     const toAnimate = new Set();
     
@@ -74,6 +92,12 @@ game.checkForLines = function() {
         }
     }
 
+    /* Adjust score */
+    if (rows.length > 0) {
+        const basePoints = [40, 100, 300, 1200];
+        game.currentScore += basePoints[rows.length - 1] * (game.level + 1);
+    }
+
     /* Create animations */
     for (const tile of toAnimate) {
         game.animations.push(createEaseAnimation(tile.drawPos, 'y', tile.pos.y, 300));
@@ -106,6 +130,10 @@ game.newTile = function() {
     // Add new tile to buffer
     game.tilesBuffer.push(new Tile(game.grid, Tile.randomTile()));
 
+    // Add score
+    game.totalScore += game.currentScore;
+    game.currentScore = 0;
+
     return !game.tileActive.detectCollision(game, x => x);
 };
 
@@ -115,6 +143,26 @@ game.resizeCanvas = function() {
     return {
         width: container.offsetWidth - 1,
         height: container.offsetHeight
+    };
+};
+
+game.update = function(ctx) {
+
+    game.lastUpdate = performance.now();
+
+    // Move active tile down one
+    const prevActive = game.tileActive;
+    const moved = game.tileActive.moveDown(game);
+    // If there was a collision with the falling tile
+    if (!moved) {
+        // The previously falling tile will need an update as it is now static so won't be updated otherwise
+        if (prevActive) prevActive.render(ctx, game.cellSize);
+        // Make a new falling tile
+        if (!game.newTile()) {
+            // If there is no space, game over
+            game.playing = false;
+            document.getElementById('game-over').setAttribute('style', 'display: block;');
+        }
     }
 };
 
@@ -122,9 +170,12 @@ game.init = function() {
 
     document.getElementById('game-over').setAttribute('style', '');
 
-    redraw = true;
-    lastUpdate = performance.now();
-    lastKeyUpdate = performance.now();
+    game.updatePeriod = 500;
+    game.lastUpdate = performance.now();
+
+    game.level = 0;
+    game.totalScore = 0;
+    game.currentScore = 0;
 
     // Initialise grid + tile arrays
     game.grid = { width: 10, height: 20 };
@@ -141,12 +192,14 @@ game.init = function() {
     game.playing = true;
 };
 
+
 game.tick = function({canvas, ctx}) {
 
-    /* Update performance stats */
+    const currentTime = performance.now();
+
+    /* Update fps meter */
     
     document.getElementById('fps').innerText = Math.round(1000 / game.delta);
-    const currentTime = performance.now();
 
 
     /* Carry out animations */
@@ -165,70 +218,50 @@ game.tick = function({canvas, ctx}) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     game.tiles.forEach(t => t.render(ctx, game.cellSize));
-    redraw = false;
+
+
+    /* Handle keypresses */
+
+    keys.forEach(k => k.update(currentTime));
 
 
     /* Move active tile down every 'updatePeriod' ms */
 
-    if (downKeyState && currentTime - lastKeyUpdate >= keyUpdatePeriod || currentTime - lastUpdate >= updatePeriod) {
-
-        lastKeyUpdate = currentTime;
-        lastUpdate = currentTime;
-
-        // Move active tile down one
-        const prevActive = game.tileActive;
-        const moved = game.tileActive.moveDown(game);
-        // If there was a collision with the falling tile
-        if (!moved) {
-            // The previously falling tile will need an update as it is now static so won't be updated otherwise
-            if (prevActive) prevActive.render(ctx, game.cellSize);
-            // Make a new falling tile
-            if (!game.newTile()) {
-                // If there is no space, game over
-                game.playing = false;
-                document.getElementById('game-over').setAttribute('style', 'display: inline;');
-            }
-        }
-    }
+    if (currentTime - game.lastUpdate >= game.updatePeriod) game.update(ctx);
 
 
     /* Redraw the active tile */
 
     game.tileActive.render(ctx, game.cellSize);
 
+
+    /* Update DOM */
+
+    document.getElementById('score-total').innerText = game.totalScore;
+    document.getElementById('score-current').innerText = game.currentScore;
+
 };
 
 game.start();
 
 
-/* Keyboard event listeners */
+/* Next tile preview */
 
-window.addEventListener('keydown', e => {
-    switch (e.key) {
-        case "ArrowRight":
-            if (!game.playing || !game.tileActive) return;
-            if (game.tileActive.moveRight(game)) redraw = true;
-            break;
-        case "ArrowLeft":
-            if (!game.playing || !game.tileActive) return;
-            if (game.tileActive.moveLeft(game)) redraw = true;
-            break;
-        case "ArrowUp":
-            if (!game.playing || !game.tileActive) return;
-            if (game.tileActive.rotate(game)) redraw = true;
-            break;
-        case "ArrowDown":
-            downKeyState = true;
-            break;
-        case "Enter":
-            if (game.playing) return;
-            game.init();
+const preview = new Game(document.getElementById('preview-canvas'));
+
+preview.resizeCanvas = function() {
+    const size = document.getElementById('preview-container').offsetWidth;
+    return { width: size, height: size };
+};
+
+preview.tick = function({ canvas, ctx }) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (game.tilesBuffer.length > 0) {
+        game.tilesBuffer[0].renderPreview(ctx);
     }
-});
+};
 
-window.addEventListener('keyup', e => {
-    if (e.key === "ArrowDown") downKeyState = false;
-});
+preview.start();
 
 
 /* Effects canvas */
@@ -241,8 +274,8 @@ effects.resizeCanvas = function() {
     return {
         width: window.innerWidth,
         height: window.innerHeight
-    }
-}
+    };
+};
 
 effects.tick = function({ canvas, ctx, frameCount }) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -251,6 +284,6 @@ effects.tick = function({ canvas, ctx, frameCount }) {
         particle.render(ctx);
         if (particle.finished) effects.particles.splice(i, 1);
     });
-}
+};
 
 effects.start();

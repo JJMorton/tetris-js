@@ -94,6 +94,15 @@ class Tile {
         while (this.structure[this.structure.length - 1].every(x => x === 0)) this.structure.pop();
     }
 
+    renderPreview(ctx) {
+        this.drawPos = { x: 0, y: 0 };
+        this.render(ctx, ctx.canvas.width / Math.max(this.structure.length, this.structure[0].length));
+        this.drawPos = {
+            x: this.pos.x,
+            y: this.pos.y
+        }
+    }
+
     render(ctx, size) {
         ctx.fillStyle = this.colour;
         for (const cell of this) {

@@ -6,16 +6,26 @@
     <link rel="stylesheet" type="text/css" href="styles/style.css">
 </head>
 <body>
+
     <div id="game-container">
         <div id="game">
             <canvas id="game-canvas"></canvas>
+            <p id="game-over">Game over, press enter to retry</p>
         </div>
-        <p id="game-over">Game over, press enter to retry</p>
+        <div id="score-panel">
+            <p>Score: <span id="score-total">0</span></p>
+            <p>+<span id="score-current">0</span></p>
+            <div id="preview-container"><canvas id="preview-canvas"></canvas></div>
+        </div>
     </div>
+
     <canvas id="effects-canvas"></canvas>
+
     <p id="fps-container">FPS: <span id="fps">0</span></p>
+
     <script src="scripts/modules/Particle.js"></script>
     <script src="scripts/modules/Animation.js"></script>
+    <script src="scripts/modules/Key.js"></script>
     <script src="scripts/modules/Game.js"></script>
     <script src="scripts/modules/Cell.js"></script>
     <script src="scripts/modules/Tile.js"></script>
