@@ -1,7 +1,9 @@
 'use strict';
 
-let update, redraw, lastUpdate;
+let redraw, lastUpdate, lastKeyUpdate;
 const updatePeriod = 500;
+const keyUpdatePeriod = 150;
+let downKeyState = false;
 
 const game = new Game();
 
@@ -24,14 +26,26 @@ game.checkForLines = function() {
     for (const lineIndex of rows) {
         for (const tile of game.tiles) {
             const removeIndex = lineIndex - tile.pos.y;
-            if (removeIndex >= 0 && removeIndex < tile.structure.length) {
-                // Empty row
-                tile.structure.splice(removeIndex, 1);
+            if (removeIndex === tile.structure.length - 1) {
+                // Line through last row of tile
+                tile.structure.pop();
+                tile.pos.y++;
+                toAnimate.add(tile);
+            }
+            else if (removeIndex >= 0 && removeIndex < tile.structure.length) {
+                // Line through middle of tile
+                const newTile = new Tile(game.grid, { structure: [0], colour: tile.colour });
+                newTile.structure = tile.structure.splice(lineIndex - tile.pos.y + 1);
+                newTile.pos = { x: tile.pos.x, y: lineIndex + 1 };
+                newTile.drawPos = { x: tile.pos.x, y: lineIndex + 1 };
+                game.tiles.push(newTile);
+
+                tile.structure.pop();
                 tile.pos.y++;
                 toAnimate.add(tile);
             }
             else if (removeIndex >= tile.structure.length) {
-                // Move entire tile down one
+                // Line below tile
                 tile.pos.y++;
                 toAnimate.add(tile);
             }
@@ -55,7 +69,10 @@ game.addAnimation = function(animation) {
 
 game.newTile = function() {
     // Add falling tile to fallen
-    if (game.tileActive) game.tiles.push(game.tileActive);
+    if (game.tileActive) {
+        game.tiles.push(game.tileActive);
+        game.tileActive.trimEmpty();
+    }
 
     // Check for lines
     game.checkForLines();
@@ -82,9 +99,9 @@ game.init = function() {
 
     document.getElementById('game-over').setAttribute('style', '');
 
-    update = true;
     redraw = true;
-    lastUpdate = 0;
+    lastUpdate = performance.now();
+    lastKeyUpdate = performance.now();
 
     // Initialise grid + tile arrays
     game.grid = { width: 10, height: 20 };
@@ -97,7 +114,6 @@ game.init = function() {
 
     // Create first tile
     game.newTile();
-    // game.tileActive.pos.y = -1; // Just a hack to make the first tile start at the top
 
     game.playing = true;
 };
@@ -105,64 +121,56 @@ game.init = function() {
 game.tick = function({canvas, ctx}) {
 
     /* Update performance stats */
+    
     document.getElementById('fps').innerText = Math.round(1000 / game.delta);
 
-    const currentTime = performance.now();
 
+    /* Carry out animations */
+
+    const currentTime = performance.now();
     game.animations.forEach((animation, i) => {
         // Remove the animation if it finished
         if (animation(currentTime)) game.animations.splice(i, 1);
     });
 
+
     if (!game.playing) return;
 
-    if (currentTime - lastUpdate >= updatePeriod) update = true;
 
-    // if (update || redraw) {
+    /* Redraw all static tiles */
 
-        /* Clear cells */
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    game.tiles.forEach(t => t.render(ctx, game.cellSize));
+    redraw = false;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const updateTile = function(tile) {
-            ctx.fillStyle = tile.colour;
-            for (const cell of tile) {
-                if (cell.filled) {
-                    ctx.fillRect(cell.drawX * game.cellSize, cell.drawY * game.cellSize, game.cellSize, game.cellSize);
-                }
+    /* Move active tile down every 'updatePeriod' ms */
+
+    if (downKeyState && currentTime - lastKeyUpdate >= keyUpdatePeriod || currentTime - lastUpdate >= updatePeriod) {
+
+        lastKeyUpdate = currentTime;
+        lastUpdate = currentTime;
+
+        // Move active tile down one
+        const prevActive = game.tileActive;
+        const moved = game.tileActive.moveDown(game);
+        // If there was a collision with the falling tile
+        if (!moved) {
+            // The previously falling tile will need an update as it is now static so won't be updated otherwise
+            if (prevActive) prevActive.render(ctx, game.cellSize);
+            // Make a new falling tile
+            if (!game.newTile()) {
+                // If there is no space, game over
+                game.playing = false;
+                document.getElementById('game-over').setAttribute('style', 'display: inline;');
             }
         }
-
-        for (const tile of game.tiles) updateTile(tile);
-
-        redraw = false;
+    }
 
 
-        if (update) {
+    /* Redraw the active tile */
 
-            lastUpdate = currentTime;
-
-            // Move active tile down one
-            const prevActive = game.tileActive;
-            const moved = game.tileActive.moveDown(game);
-            // If there was a collision with the falling tile
-            if (!moved) {
-                // The previously falling tile will need an update as it is now static so won't be updated otherwise
-                if (prevActive) updateTile(prevActive);
-                // Make a new falling tile
-                if (!game.newTile()) {
-                    // If there is no space, game over
-                    game.playing = false;
-                    document.getElementById('game-over').setAttribute('style', 'display: inline;');
-                }
-            }
-        }
-
-        update = false;
-
-        updateTile(game.tileActive);
-
-    // }
+    game.tileActive.render(ctx, game.cellSize);
 
 };
 
@@ -183,11 +191,16 @@ window.addEventListener('keydown', e => {
             if (game.tileActive.rotate(game)) redraw = true;
             break;
         case "ArrowDown":
-            if (!game.playing || !game.tileActive) return;
-            if (game.tileActive.moveDown(game)) redraw = true;
+            // if (!game.playing || !game.tileActive) return;
+            // if (game.tileActive.moveDown(game)) redraw = true;
+            downKeyState = true;
             break;
         case "Enter":
             if (game.playing) return;
             game.init();
     }
+});
+
+window.addEventListener('keyup', e => {
+    if (e.key === "ArrowDown") downKeyState = false;
 });

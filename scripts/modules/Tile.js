@@ -18,14 +18,12 @@ class Tile {
 
     getSides(x, y) {
         // Returns a class list of sides that are connected to another cell
-        let list = [];
-
-        if (y > 0 && this.structure[y - 1][x]) list.push("top");
-        if (x < this.structure[0].length - 1 && this.structure[y][x + 1]) list.push("right");
-        if (y < this.structure.length - 1 && this.structure[y + 1][x]) list.push("bottom");
-        if (x > 0 && this.structure[y][x - 1]) list.push("left");
-
-        return list.join(" ");
+        return [
+            y > 0 && this.structure[y - 1][x],
+            x < this.structure[0].length - 1 && this.structure[y][x + 1],
+            y < this.structure.length - 1 && this.structure[y + 1][x],
+            x > 0 && this.structure[y][x - 1]
+        ];
     }
 
     detectCollision(game, transform) {
@@ -91,12 +89,26 @@ class Tile {
         return (!collision); 
     }
 
+    trimEmpty() {
+        // Remove empty rows
+        while (this.structure[this.structure.length - 1].every(x => x === 0)) this.structure.pop();
+    }
+
+    render(ctx, size) {
+        ctx.fillStyle = this.colour;
+        for (const cell of this) {
+            if (cell.filled) {
+                cell.render(ctx, size, this.getSides(cell.relX, cell.relY));
+            }
+        }
+    }
+
     [Symbol.iterator]() {
         // Return arr with coordinates for each cell
         const struct = [];
         for (let y = 0; y < this.structure.length; y++) {
             for (let x = 0; x < this.structure[0].length; x++) {
-                struct.push({
+                struct.push(new Cell({
                     relX: x,
                     relY: y,
                     x: x + this.pos.x,
@@ -104,7 +116,7 @@ class Tile {
                     drawX: x + this.drawPos.x,
                     drawY: y + this.drawPos.y,
                     filled: this.structure[y][x]
-                });
+                }));
             }
         }
         return struct.values();
