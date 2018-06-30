@@ -1,11 +1,17 @@
 'use strict';
 
+
+/* Variables to keep track of timing */
+
 let redraw, lastUpdate, lastKeyUpdate;
 const updatePeriod = 500;
 const keyUpdatePeriod = 150;
 let downKeyState = false;
 
-const game = new Game();
+
+/* Main game */
+
+const game = new Game(document.getElementById('game-canvas'));
 
 game.checkForLines = function() {
     let rows = new Array(game.grid.height).fill(0);
@@ -24,8 +30,24 @@ game.checkForLines = function() {
     const toAnimate = new Set();
     
     for (const lineIndex of rows) {
+
+        const gameContainer = document.getElementById('game-container');
+        const pOffset = { x: gameContainer.offsetLeft, y: gameContainer.offsetTop };
+
         for (const tile of game.tiles) {
             const removeIndex = lineIndex - tile.pos.y;
+
+            /* Particle effects */
+            if (removeIndex >= 0 && removeIndex < tile.structure.length) {
+                tile.structure[removeIndex].forEach((filled, i) => {
+                    if (!filled) return;
+                    for (let j = 0; j < 5; j++) effects.particles.push(
+                        new Particle(pOffset.x + (i + tile.pos.x + 0.5) * game.cellSize, pOffset.y + (lineIndex + 0.5) * game.cellSize, tile.colour)
+                    );
+                });
+            }
+
+            /* Remove cells */
             if (removeIndex === tile.structure.length - 1) {
                 // Line through last row of tile
                 tile.structure.pop();
@@ -52,6 +74,7 @@ game.checkForLines = function() {
         }
     }
 
+    /* Create animations */
     for (const tile of toAnimate) {
         game.animations.push(createEaseAnimation(tile.drawPos, 'y', tile.pos.y, 300));
     }
@@ -123,14 +146,15 @@ game.tick = function({canvas, ctx}) {
     /* Update performance stats */
     
     document.getElementById('fps').innerText = Math.round(1000 / game.delta);
+    const currentTime = performance.now();
 
 
     /* Carry out animations */
-
-    const currentTime = performance.now();
+    
     game.animations.forEach((animation, i) => {
         // Remove the animation if it finished
-        if (animation(currentTime)) game.animations.splice(i, 1);
+        animation(currentTime);
+        if (animation.finished) game.animations.splice(i, 1);
     });
 
 
@@ -176,6 +200,9 @@ game.tick = function({canvas, ctx}) {
 
 game.start();
 
+
+/* Keyboard event listeners */
+
 window.addEventListener('keydown', e => {
     switch (e.key) {
         case "ArrowRight":
@@ -191,8 +218,6 @@ window.addEventListener('keydown', e => {
             if (game.tileActive.rotate(game)) redraw = true;
             break;
         case "ArrowDown":
-            // if (!game.playing || !game.tileActive) return;
-            // if (game.tileActive.moveDown(game)) redraw = true;
             downKeyState = true;
             break;
         case "Enter":
@@ -204,3 +229,28 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => {
     if (e.key === "ArrowDown") downKeyState = false;
 });
+
+
+/* Effects canvas */
+
+const effects = new Game(document.getElementById('effects-canvas'));
+
+effects.particles = [];
+
+effects.resizeCanvas = function() {
+    return {
+        width: window.innerWidth,
+        height: window.innerHeight
+    }
+}
+
+effects.tick = function({ canvas, ctx, frameCount }) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    effects.particles.forEach((particle, i) => {
+        particle.tick();
+        particle.render(ctx);
+        if (particle.finished) effects.particles.splice(i, 1);
+    });
+}
+
+effects.start();

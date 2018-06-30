@@ -2,8 +2,8 @@
 
 class Game {
     
-    constructor() {
-        this.canvas = document.querySelector('canvas');
+    constructor(canvas) {
+        this.canvas = canvas;
         this.ctx = this.canvas.getContext('2d');
         this.frameCount = 0;
         this.delta = 0;
@@ -45,6 +45,7 @@ class Game {
         const size = this.resizeCanvas();
         this.canvas.width = size.width;
         this.canvas.height = size.height;
+        this.ctx = this.canvas.getContext('2d');
     }
 
 

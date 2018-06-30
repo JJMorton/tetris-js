@@ -20,6 +20,11 @@ body {
     right: 0;
 }
 
+#effects-canvas {
+    vertical-align: bottom;
+    position: absolute;
+}
+
 #game-container {
     position: absolute;
     height: 90vh;

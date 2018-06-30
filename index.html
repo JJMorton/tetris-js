@@ -8,11 +8,13 @@
 <body>
     <div id="game-container">
         <div id="game">
-            <canvas></canvas>
+            <canvas id="game-canvas"></canvas>
         </div>
         <p id="game-over">Game over, press enter to retry</p>
     </div>
+    <canvas id="effects-canvas"></canvas>
     <p id="fps-container">FPS: <span id="fps">0</span></p>
+    <script src="scripts/modules/Particle.js"></script>
     <script src="scripts/modules/Animation.js"></script>
     <script src="scripts/modules/Game.js"></script>
     <script src="scripts/modules/Cell.js"></script>

@@ -9,9 +9,10 @@ const createAnimationType = function(timeFunc) {
             const time = ((currentTime - startTime) / length);
             obj[prop] = timeFunc(time, initial, final);
             if (currentTime >= startTime + length) obj[prop] = final;
-            return obj[prop] === final;
+            this.finished = obj[prop] === final;
         }
         anim.target = obj;
+        anim.finished = false;
 
         return anim;
 
