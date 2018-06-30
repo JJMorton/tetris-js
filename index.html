@@ -7,10 +7,15 @@
 </head>
 <body>
     <div id="game-container">
-        <div id="game"></div>
+        <div id="game">
+            <canvas></canvas>
+        </div>
         <p id="game-over">Game over, press enter to retry</p>
     </div>
     <p id="fps-container">FPS: <span id="fps">0</span></p>
-    <script src="scripts/script.js" type="module"></script>
+    <script src="scripts/modules/Animation.js"></script>
+    <script src="scripts/modules/Game.js"></script>
+    <script src="scripts/modules/Tile.js"></script>
+    <script src="scripts/script.js"></script>
 </body>
 </html>

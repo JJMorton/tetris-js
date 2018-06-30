@@ -1,20 +1,9 @@
 'use strict';
 
-import { Game } from "./modules/Game.js";
-import { Tile } from "./modules/Tile.js";
-
 let update, redraw, lastUpdate;
 const updatePeriod = 500;
 
 const game = new Game();
-
-game.getCellState = function(x, y) {
-    const row = document.getElementById('game').children[y];
-    if (!row) return false;
-    const cell = row.children[x];
-    if (!cell) return false;
-    return cell.classList.contains("enabled");
-}
 
 game.checkForLines = function() {
     let rows = new Array(game.grid.height).fill(0);
@@ -29,6 +18,8 @@ game.checkForLines = function() {
         .filter(x => x >= 0);
     
     if (rows.length > 0) redraw = true;
+
+    const toAnimate = new Set();
     
     for (const lineIndex of rows) {
         for (const tile of game.tiles) {
@@ -37,14 +28,30 @@ game.checkForLines = function() {
                 // Empty row
                 tile.structure.splice(removeIndex, 1);
                 tile.pos.y++;
+                toAnimate.add(tile);
             }
             else if (removeIndex >= tile.structure.length) {
                 // Move entire tile down one
                 tile.pos.y++;
+                toAnimate.add(tile);
             }
         }
     }
-}
+
+    for (const tile of toAnimate) {
+        game.animations.push(createEaseAnimation(tile.drawPos, 'y', tile.pos.y, 300));
+    }
+};
+
+game.addAnimation = function(animation) {
+    // Remove existing animations for target
+    game.animations.forEach((other, i) => {
+        if (other.target === animation.target) {
+            game.animations.splice(i, 1);
+        }
+    });
+    game.animations.push(animation);
+};
 
 game.newTile = function() {
     // Add falling tile to fallen
@@ -60,7 +67,16 @@ game.newTile = function() {
     game.tilesBuffer.push(new Tile(game.grid, Tile.randomTile()));
 
     return !game.tileActive.detectCollision(game, x => x);
-}
+};
+
+game.resizeCanvas = function() {
+    const container = document.getElementById('game');
+    game.cellSize = container.offsetWidth / game.grid.width;
+    return {
+        width: container.offsetWidth - 1,
+        height: container.offsetHeight
+    }
+};
 
 game.init = function() {
 
@@ -70,65 +86,49 @@ game.init = function() {
     redraw = true;
     lastUpdate = 0;
 
-    // Initialise empty grid
+    // Initialise grid + tile arrays
     game.grid = { width: 10, height: 20 };
     game.tiles = []; // Fallen tiles
     game.tilesBuffer = new Array(2).fill(null).map(x => new Tile(game.grid, Tile.randomTile())); // Reserve tiles
     game.tileActive = undefined;
 
+    // Running animations
+    game.animations = [];
+
     // Create first tile
     game.newTile();
-    game.tileActive.pos.y = -1; // Just a hack to make the first tile start at the top
-
-
-    // Initialise document structure
-    const frag = document.createDocumentFragment();
-    for (let i = 0; i < game.grid.height; i++) {
-        const row = document.createElement('div');
-        row.className = "row";
-        for (let j = 0; j < game.grid.width; j++) {
-            const cell = document.createElement('div');
-            cell.className = "cell disabled";
-            row.appendChild(cell);
-        }
-        frag.appendChild(row);
-    }
-    const container = document.getElementById('game');
-    container.innerHTML = "";
-    container.appendChild(frag);
+    // game.tileActive.pos.y = -1; // Just a hack to make the first tile start at the top
 
     game.playing = true;
 };
 
-game.tick = function({delta}) {
+game.tick = function({canvas, ctx}) {
 
     /* Update performance stats */
-    document.getElementById('fps').innerText = Math.round(1000 / delta);
+    document.getElementById('fps').innerText = Math.round(1000 / game.delta);
+
+    const currentTime = performance.now();
+
+    game.animations.forEach((animation, i) => {
+        // Remove the animation if it finished
+        if (animation(currentTime)) game.animations.splice(i, 1);
+    });
 
     if (!game.playing) return;
 
-    const currentTime = performance.now();
     if (currentTime - lastUpdate >= updatePeriod) update = true;
 
-    if (update || redraw) {
+    // if (update || redraw) {
 
         /* Clear cells */
 
-        const container = document.getElementById('game');
-        for (const row of container.childNodes) {
-            for (const cell of row.childNodes) {
-                cell.className = 'cell disabled';
-                cell.setAttribute('style', '');
-            }
-        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const updateTile = function(tile) {
+            ctx.fillStyle = tile.colour;
             for (const cell of tile) {
                 if (cell.filled) {
-                    const active = container.childNodes[cell.y].childNodes[cell.x];
-                    if (!active) return;
-                    active.className = 'cell enabled ' + tile.getSides(cell.relX, cell.relY);
-                    active.setAttribute('style', `background-color: ${tile.colour};`);
+                    ctx.fillRect(cell.drawX * game.cellSize, cell.drawY * game.cellSize, game.cellSize, game.cellSize);
                 }
             }
         }
@@ -162,13 +162,13 @@ game.tick = function({delta}) {
 
         updateTile(game.tileActive);
 
-    }
+    // }
 
 };
 
 game.start();
 
-addEventListener('keydown', e => {
+window.addEventListener('keydown', e => {
     switch (e.key) {
         case "ArrowRight":
             if (!game.playing || !game.tileActive) return;

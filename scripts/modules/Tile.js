@@ -1,4 +1,6 @@
-export class Tile {
+'use strict';
+
+class Tile {
     
     constructor(grid, {structure, colour}) {
         this.grid = grid;
@@ -8,6 +10,10 @@ export class Tile {
             x: Math.floor(grid.width / 2 - this.structure[0].length / 2),
             y: 0
         };
+        this.drawPos = {
+            x: this.pos.x,
+            y: this.pos.y
+        }
     }
 
     getSides(x, y) {
@@ -43,21 +49,30 @@ export class Tile {
     moveDown(game) {
         const transform = ({x, y}) => ({x, y: y + 1});
         const collision = this.detectCollision(game, transform);
-        if (!collision) this.pos.y++;
+        if (!collision) {
+            this.pos.y++;
+            game.animations.push(createLinearAnimation(this.drawPos, 'y', this.pos.y, 100));
+        }
         return (!collision);
     }
     
     moveLeft(game) {
         const transform = ({x, y}) => ({x: x - 1, y});
         const collision = this.detectCollision(game, transform);
-        if (!collision) this.pos.x--;
+        if (!collision) {
+            this.pos.x--;
+            game.animations.push(createLinearAnimation(this.drawPos, 'x', this.pos.x, 100));
+        }
         return (!collision);
     }
 
     moveRight(game) {
         const transform = ({x, y}) => ({x: x + 1, y});
         const collision = this.detectCollision(game, transform);
-        if (!collision) this.pos.x++;
+        if (!collision) {
+            this.pos.x++;
+            game.animations.push(createLinearAnimation(this.drawPos, 'x', this.pos.x, 100));
+        }
         return (!collision);
     }
 
@@ -86,6 +101,8 @@ export class Tile {
                     relY: y,
                     x: x + this.pos.x,
                     y: y + this.pos.y,
+                    drawX: x + this.drawPos.x,
+                    drawY: y + this.drawPos.y,
                     filled: this.structure[y][x]
                 });
             }
