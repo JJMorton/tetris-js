@@ -15,13 +15,17 @@
         <div id="score-panel">
             <p>Score: <span id="score-total">0</span></p>
             <p>+<span id="score-current">0</span></p>
-            <div id="preview-container"><canvas id="preview-canvas"></canvas></div>
+            <p>Time: <span id="time">00:00</span></p>
+            <div class="small-canvas-container">
+                <div id="preview-container"><canvas id="preview-canvas" class="small-canvas"></canvas></div>
+                <p>Preview</p>
+            </div>
         </div>
     </div>
 
     <canvas id="effects-canvas"></canvas>
 
-    <p id="fps-container">FPS: <span id="fps">0</span></p>
+    <p id="fps-container">Game Time: <span id="game-time">0</span>, FPS: <span id="fps">0</span></p>
 
     <script src="scripts/modules/Particle.js"></script>
     <script src="scripts/modules/Animation.js"></script>

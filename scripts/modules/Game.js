@@ -10,8 +10,18 @@ class Game {
         this.deltaMin = 0;
         this.lastFrameTime = 0;
         this.playing = false;
+        this.paused = false;
+        this.totalTimePlaying = 0;
 
         window.addEventListener('resize', this._resizeCanvas.bind(this));
+    }
+
+    get currentTime() {
+        return this.totalTimePlaying;
+    }
+
+    logTimePlaying() {
+        this.totalTimePlaying += this.delta;
     }
 
     animate() {

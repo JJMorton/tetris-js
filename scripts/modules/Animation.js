@@ -1,15 +1,14 @@
 const createAnimationType = function(timeFunc) {
-    return function(obj, prop, final, length) {
+    return function({ obj, prop, finalValue, startTime, duration }) {
 
-        const startTime = performance.now();
         const initial = obj[prop];
 
         const anim = function(currentTime) {
             if (!obj) return true;
-            const time = ((currentTime - startTime) / length);
-            obj[prop] = timeFunc(time, initial, final);
-            if (currentTime >= startTime + length) obj[prop] = final;
-            this.finished = obj[prop] === final;
+            const time = ((currentTime - startTime) / duration);
+            obj[prop] = timeFunc(time, initial, finalValue);
+            if (currentTime >= startTime + duration) obj[prop] = finalValue;
+            this.finished = obj[prop] === finalValue;
         }
         anim.target = obj;
         anim.finished = false;

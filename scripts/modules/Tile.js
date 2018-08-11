@@ -14,10 +14,12 @@ class Tile {
             x: this.pos.x,
             y: this.pos.y
         }
+        this.animationDuration = 50;
     }
 
     getSides(x, y) {
-        // Returns a class list of sides that are connected to another cell
+        // Returns an array of sides that are connected to another cell
+        // Top, clockwise
         return [
             y > 0 && this.structure[y - 1][x],
             x < this.structure[0].length - 1 && this.structure[y][x + 1],
@@ -32,7 +34,7 @@ class Tile {
             const abs = transform(cell);
             const rel = { x: abs.x - this.pos.x, y: abs.y - this.pos.y };
             if (abs.x < 0 || abs.x >= game.grid.width || abs.y < 0 || abs.y >= game.grid.height) return true;
-            // Compares each cell of this tile to every other cell
+            // Compares each cell of this tile to cells in every other tile
             // Fairly inefficient but there are never many tiles so should not be an issue
             for (const otherTile of game.tiles) {
                 for (const otherCell of otherTile) {
@@ -44,12 +46,33 @@ class Tile {
         return false;
     }
 
+    hardDrop(game) {
+        const offsetY = this.getHeightAboveGround(game);
+        if (offsetY === 0) return;
+        this.pos.y += offsetY;
+        game.addAnimation(createLinearAnimation({
+            obj: this.drawPos,
+            prop: 'y',
+            finalValue: this.pos.y,
+            startTime: game.currentTime,
+            duration: this.animationDuration
+        }));
+        game.resetUpdateInterval();
+        game.currentScore += offsetY;
+    }
+
     moveDown(game) {
         const transform = ({x, y}) => ({x, y: y + 1});
         const collision = this.detectCollision(game, transform);
         if (!collision) {
             this.pos.y++;
-            game.animations.push(createLinearAnimation(this.drawPos, 'y', this.pos.y, 100));
+            game.addAnimation(createLinearAnimation({
+                obj: this.drawPos,
+                prop: 'y',
+                finalValue: this.pos.y,
+                startTime: game.currentTime,
+                duration: this.animationDuration
+            }));
         }
         return (!collision);
     }
@@ -59,7 +82,13 @@ class Tile {
         const collision = this.detectCollision(game, transform);
         if (!collision) {
             this.pos.x--;
-            game.animations.push(createLinearAnimation(this.drawPos, 'x', this.pos.x, 100));
+            game.addAnimation(createLinearAnimation({
+                obj: this.drawPos,
+                prop: 'x',
+                finalValue: this.pos.x,
+                startTime: game.currentTime,
+                duration: this.animationDuration
+            }));
         }
         return (!collision);
     }
@@ -69,7 +98,13 @@ class Tile {
         const collision = this.detectCollision(game, transform);
         if (!collision) {
             this.pos.x++;
-            game.animations.push(createLinearAnimation(this.drawPos, 'x', this.pos.x, 100));
+            game.addAnimation(createLinearAnimation({
+                obj: this.drawPos,
+                prop: 'x',
+                finalValue: this.pos.x,
+                startTime: game.currentTime,
+                duration: this.animationDuration
+            }));
         }
         return (!collision);
     }
@@ -94,20 +129,50 @@ class Tile {
         while (this.structure[this.structure.length - 1].every(x => x === 0)) this.structure.pop();
     }
 
+    getHeightAboveGround(game) {
+        let offsetY = 0;
+        while (!this.detectCollision(game, ({x, y}) => ({x, y: y + offsetY}) )) offsetY++;
+        return --offsetY;
+    }
+
+    projectDown(game) {
+        const offsetY = this.getHeightAboveGround(game);
+        game.ctx.strokeStyle = "#ffffff";
+        this.render({
+            ctx: game.ctx,
+            size: game.cellSize,
+            fill: false,
+            stroke: true,
+            offset: {
+                x: this.pos.x - this.drawPos.x,
+                y: offsetY + (this.pos.y - this.drawPos.y)
+            }
+        });
+    }
+
     renderPreview(ctx) {
         this.drawPos = { x: 0, y: 0 };
-        this.render(ctx, ctx.canvas.width / Math.max(this.structure.length, this.structure[0].length));
+        this.render({
+            ctx,
+            size: ctx.canvas.width / Math.max(this.structure.length, this.structure[0].length),
+            fill: true,
+            stroke: false
+        });
         this.drawPos = {
             x: this.pos.x,
             y: this.pos.y
         }
     }
 
-    render(ctx, size) {
+    render({ ctx, size, fill = true, stroke = false, offset = {x: 0, y: 0} }) {
         ctx.fillStyle = this.colour;
+        ctx.strokeStyle = this.colour;
         for (const cell of this) {
             if (cell.filled) {
-                cell.render(ctx, size, this.getSides(cell.relX, cell.relY));
+                cell.render({
+                    ctx, size, fill, stroke, offset,
+                    sides: this.getSides(cell.relX, cell.relY)
+                });
             }
         }
     }

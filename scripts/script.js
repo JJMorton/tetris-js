@@ -1,5 +1,13 @@
 'use strict';
 
+{
+    const container = document.getElementById("game-container");
+    const handler = function() {
+        container.style.fontSize = `${20 * container.offsetWidth / 500}px`;
+    };
+    window.addEventListener('resize', handler);
+    handler();
+}
 
 const game = new Game(document.getElementById('game-canvas'));
 
@@ -26,7 +34,12 @@ const keys = [
     }),
 
     new Key("Enter", 0, () => {
-        if (!game.playing) game.init();
+        if (!game.playing) game.init(); // Start new game if not playing
+        else game.paused = !game.paused; // Pause / unpause if playing
+    }),
+
+    new Key(" ", 0, () => {
+        if (game.playing && game.tileActive) game.tileActive.hardDrop(game);
     })
 ]
 
@@ -100,17 +113,23 @@ game.checkForLines = function() {
 
     /* Create animations */
     for (const tile of toAnimate) {
-        game.animations.push(createEaseAnimation(tile.drawPos, 'y', tile.pos.y, 300));
+        game.addAnimation(createEaseAnimation({
+            obj: tile.drawPos,
+            prop: 'y',
+            finalValue: tile.pos.y,
+            startTime: game.currentTime,
+            duration: 300
+        }));
     }
 };
 
 game.addAnimation = function(animation) {
     // Remove existing animations for target
-    game.animations.forEach((other, i) => {
-        if (other.target === animation.target) {
-            game.animations.splice(i, 1);
-        }
-    });
+    // game.animations.forEach((other, i) => {
+    //     if (other.target === animation.target) {
+    //         game.animations.splice(i, 1);
+    //     }
+    // });
     game.animations.push(animation);
 };
 
@@ -141,14 +160,14 @@ game.resizeCanvas = function() {
     const container = document.getElementById('game');
     game.cellSize = container.offsetWidth / game.grid.width;
     return {
-        width: container.offsetWidth - 1,
+        width: container.offsetWidth,
         height: container.offsetHeight
     };
 };
 
 game.update = function(ctx) {
 
-    game.lastUpdate = performance.now();
+    game.resetUpdateInterval();
 
     // Move active tile down one
     const prevActive = game.tileActive;
@@ -156,27 +175,97 @@ game.update = function(ctx) {
     // If there was a collision with the falling tile
     if (!moved) {
         // The previously falling tile will need an update as it is now static so won't be updated otherwise
-        if (prevActive) prevActive.render(ctx, game.cellSize);
+        if (prevActive) prevActive.render({ ctx, size: game.cellSize });
         // Make a new falling tile
         if (!game.newTile()) {
             // If there is no space, game over
             game.playing = false;
-            document.getElementById('game-over').setAttribute('style', 'display: block;');
+            document.getElementById('game').setAttribute("gameover", true);
         }
     }
 };
 
+const tickPlaying = function(canvas, ctx) {
+    
+    const currentTime = game.currentTime;
+    
+    game.logTimePlaying();
+    
+    /* Carry out animations */
+    
+    game.animations.forEach((animation, i) => {
+        // Remove the animation if it finished
+        animation(currentTime);
+        if (animation.finished) game.animations.splice(i, 1);
+    });
+    
+    /* Redraw all static tiles */
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    game.tiles.forEach(t => t.render({ ctx, size: game.cellSize }));
+    
+    /* Handle keypresses */
+    
+    keys.forEach(k => k.update(currentTime));
+
+    /* Move active tile down every 'updatePeriod' ms */
+    
+    if (currentTime - game.lastUpdate >= game.updatePeriod) game.update(ctx);
+    
+    /* Redraw the active tile */
+    
+    game.tileActive.render({ ctx, size: game.cellSize });
+    game.tileActive.projectDown(game);
+    
+    /* Update DOM */
+    
+    document.getElementById('score-total').innerText = game.totalScore;
+    document.getElementById('score-current').innerText = game.currentScore;
+
+    const raw_seconds = game.currentTime / 1000;
+    const minutes = Math.floor(raw_seconds / 60).toString().padStart(2, "0");
+    const seconds = Math.floor(raw_seconds % 60).toString().padStart(2, "0");
+    document.getElementById('time').innerText = `${minutes}:${seconds}`;
+};
+
+
+const tickPaused = function(canvas, ctx) {
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(canvas.width / 2 - 50, canvas.height / 2 - 50, 25, 100);
+    ctx.fillRect(canvas.width / 2 + 25, canvas.height / 2 - 50, 25, 100);
+};
+
+
+game.tick = function({canvas, ctx}) {
+
+    /* Update fps meter */
+    
+    document.getElementById('fps').innerText = Math.round(1000 / game.delta);
+    document.getElementById('game-time').innerText = game.currentTime;
+
+    if (game.playing) {
+        game.paused
+            ? tickPaused(canvas, ctx)
+            : tickPlaying(canvas, ctx);
+    }
+
+};
+
 game.init = function() {
 
-    document.getElementById('game-over').setAttribute('style', '');
+    document.getElementById('game').setAttribute("gameover", false);
 
     game.updatePeriod = 500;
-    game.lastUpdate = performance.now();
-
+    
     game.level = 0;
     game.totalScore = 0;
     game.currentScore = 0;
+    game.totalTimePlaying = 0;
 
+    game.resetUpdateInterval();
+    
     // Initialise grid + tile arrays
     game.grid = { width: 10, height: 20 };
     game.tiles = []; // Fallen tiles
@@ -190,56 +279,12 @@ game.init = function() {
     game.newTile();
 
     game.playing = true;
+    game.paused = false;
 };
 
 
-game.tick = function({canvas, ctx}) {
-
-    const currentTime = performance.now();
-
-    /* Update fps meter */
-    
-    document.getElementById('fps').innerText = Math.round(1000 / game.delta);
-
-
-    /* Carry out animations */
-    
-    game.animations.forEach((animation, i) => {
-        // Remove the animation if it finished
-        animation(currentTime);
-        if (animation.finished) game.animations.splice(i, 1);
-    });
-
-
-    if (!game.playing) return;
-
-
-    /* Redraw all static tiles */
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    game.tiles.forEach(t => t.render(ctx, game.cellSize));
-
-
-    /* Handle keypresses */
-
-    keys.forEach(k => k.update(currentTime));
-
-
-    /* Move active tile down every 'updatePeriod' ms */
-
-    if (currentTime - game.lastUpdate >= game.updatePeriod) game.update(ctx);
-
-
-    /* Redraw the active tile */
-
-    game.tileActive.render(ctx, game.cellSize);
-
-
-    /* Update DOM */
-
-    document.getElementById('score-total').innerText = game.totalScore;
-    document.getElementById('score-current').innerText = game.currentScore;
-
+game.resetUpdateInterval = function() {
+    game.lastUpdate = game.currentTime;
 };
 
 game.start();
@@ -250,7 +295,7 @@ game.start();
 const preview = new Game(document.getElementById('preview-canvas'));
 
 preview.resizeCanvas = function() {
-    const size = document.getElementById('preview-container').offsetWidth;
+    const size = document.getElementById('preview-container').clientWidth;
     return { width: size, height: size };
 };
 
